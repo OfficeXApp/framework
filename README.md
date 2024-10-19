@@ -2,7 +2,7 @@
 
 `OFX = Offchain First Experience`
 
-A framework for creating local offline client first dapps with decentralized cloud backends.
+A framework for creating local offline client first dapps with decentralized cloud backends. Powers OfficeX
 
 The OFX Framework is an open-source framework for creating local offline client first dapps with decentralized cloud backends. This allows you to build “free unlimited dapps” that don’t cost any gas, but can gracefully upgrade to a gas toll cloud, which is 100x cheaper than centralized solutions. This library is the “open-core” of OfficeX, a superior clone of Google Docs / Microsoft Office.
 
