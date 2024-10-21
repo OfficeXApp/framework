@@ -317,11 +317,11 @@ export class StorjClient {
   // Update getSignedUrl to be async and return a Promise
   public static async getSignedUrl({
     key,
-    expires,
+    expires = 3600 * 24 * 7, // Default to 7 days for now
     customFilename,
   }: {
     key: string;
-    expires?: number; // Default to 1 hour
+    expires?: number;
     customFilename?: string;
   }): Promise<string> {
     if (!StorjClient.s3) {
@@ -349,7 +349,7 @@ export class StorjClient {
 
     try {
       const url = await getSignedUrlS3(StorjClient.s3!, command, {
-        expiresIn: expires || 3600,
+        expiresIn: expires,
       });
       return url;
     } catch (error) {
