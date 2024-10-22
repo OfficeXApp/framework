@@ -31,3 +31,7 @@ Folder based filesystem with 3 tiers of storage
 - Client-Bootstrap mode. Uses the document owners local machine as the WebRTC server. Session is only active when the owner keeps their computer active.
 
 These combined features make up the OFX Framework. This pattern enables you to build “free unlimited dapps” that don’t cost any gas, but can gracefully upgrade to a gas toll cloud, which is 100x cheaper than centralized solutions.
+
+## License
+
+Licensed under Apache 2.0 Open Source
