@@ -6,6 +6,8 @@ import {
   GetObjectCommand,
   CompletedPart,
   ListBucketsCommand,
+  ObjectCannedACL,
+  PutObjectAclCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl as getSignedUrlS3 } from "@aws-sdk/s3-request-presigner"; // For signed URLs
 import { Observable, Observer } from "rxjs";
@@ -296,6 +298,13 @@ export class StorjClient {
                 progress: 100,
                 metadataFragment: finalMetadataFragment,
               });
+              const input = {
+                ACL: ObjectCannedACL.public_read, // keep it public for now
+                Bucket: StorjClient.DEFAULT_BUCKET,
+                Key: key,
+              };
+              const command = new PutObjectAclCommand(input);
+              await StorjClient.s3!.send(command);
               observer.complete();
             };
           } catch (error) {
