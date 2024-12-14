@@ -1,5 +1,9 @@
 # To Do
 
+## New ToDo
+
+- [ ] Add unit tests for .lastChangedUnixMs and surgicallySyncFileUUID/surgicallySyncFolderUUID
+
 ## Quick Notes
 
 - [ ] Change back to 7 days signed urls file sharing

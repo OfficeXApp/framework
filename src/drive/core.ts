@@ -41,6 +41,7 @@ import {
   filter,
   // finalize,
   from,
+  // last,
   // map,
   mergeMap,
   Observable,
@@ -198,6 +199,7 @@ class DriveDB {
       storageLocation,
       fileSize: metadata?.fileSize || 0,
       rawURL: metadata?.rawURL || "",
+      lastChangedUnixMs: now.getTime(),
     };
 
     // Update hashtables
@@ -256,6 +258,7 @@ class DriveDB {
         owner: userId,
         createdDate: new Date(),
         storageLocation,
+        lastChangedUnixMs: new Date().getTime(),
       };
       const folderFuseRecord: FuseRecord = {
         id: `folder:::${rootFolderUUID}`,
@@ -286,6 +289,7 @@ class DriveDB {
           owner: userId,
           createdDate: new Date(),
           storageLocation,
+          lastChangedUnixMs: new Date().getTime(),
         };
 
         this.folderUUIDToMetadata[newFolderUUID] = newFolderMetadata;
@@ -345,6 +349,7 @@ class DriveDB {
         owner: userId,
         createdDate: new Date(),
         storageLocation,
+        lastChangedUnixMs: new Date().getTime(),
       };
     }
 
@@ -385,6 +390,7 @@ class DriveDB {
           owner: userId,
           createdDate: new Date(),
           storageLocation,
+          lastChangedUnixMs: new Date().getTime(),
         };
 
         // Update hashtables
@@ -394,6 +400,7 @@ class DriveDB {
 
         // Update parent folder
         parentFolder.subfolderUUIDs.push(newFolderUUID);
+        parentFolder.lastChangedUnixMs = new Date().getTime();
 
         // Add to Fuse index for searching
         this.fuseIndex.add({
@@ -803,12 +810,12 @@ class DriveDB {
       const [type, id] = result.item.id.split(":::");
       if (type === "file") {
         const fileMetadata = this.fileUUIDToMetadata[id as FileUUID];
-        if (fileMetadata) {
+        if (fileMetadata && !fileMetadata.deleted) {
           files.push(fileMetadata);
         }
       } else if (type === "folder") {
         const folderMetadata = this.folderUUIDToMetadata[id as FolderUUID];
-        if (folderMetadata) {
+        if (folderMetadata && !folderMetadata.deleted) {
           folders.push(folderMetadata);
         }
       }
@@ -866,18 +873,20 @@ class DriveDB {
     // Delete files in this folder
     folder.fileUUIDs.forEach((fileUUID) => this.deleteFile(fileUUID));
 
-    // Remove folder from parent's subfolders
-    if (folder.parentFolderUUID) {
-      const parentFolder = this.folderUUIDToMetadata[folder.parentFolderUUID];
-      if (parentFolder) {
-        parentFolder.subfolderUUIDs = parentFolder.subfolderUUIDs.filter(
-          (uuid) => uuid !== folderUUID
-        );
-      }
-    }
+    // Don't Remove folder from parent's subfolders as we need its delete record for sync offline-cloud
+    // if (folder.parentFolderUUID) {
+    //   const parentFolder = this.folderUUIDToMetadata[folder.parentFolderUUID];
+    //   if (parentFolder) {
+    //     parentFolder.subfolderUUIDs = parentFolder.subfolderUUIDs.filter(
+    //       (uuid) => uuid !== folderUUID
+    //     );
+    //   }
+    // }
+
+    folder.lastChangedUnixMs = new Date().getTime();
+    folder.deleted = true;
 
     // Remove folder from all data structures
-    delete this.folderUUIDToMetadata[folderUUID];
     delete this.fullFolderPathToUUID[folder.fullFolderPath];
 
     this.saveHashtables();
@@ -890,17 +899,20 @@ class DriveDB {
       const file: FileMetadata = this.fileUUIDToMetadata[currentFileUUID];
       if (!file) break;
 
-      // Remove file from its folder
-      const parentFolder = this.folderUUIDToMetadata[file.folderUUID];
-      if (parentFolder) {
-        parentFolder.fileUUIDs = parentFolder.fileUUIDs.filter(
-          (uuid) => uuid !== currentFileUUID
-        );
-      }
+      // Don't Remove file from its folder as we need its delete record for sync offline-cloud
+      // const parentFolder = this.folderUUIDToMetadata[file.folderUUID];
+      // if (parentFolder) {
+      //   parentFolder.fileUUIDs = parentFolder.fileUUIDs.filter(
+      //     (uuid) => uuid !== currentFileUUID
+      //   );
+      // }
+      file.lastChangedUnixMs = new Date().getTime();
+      file.deleted = true;
 
       // Remove file from all data structures
-      delete this.fileUUIDToMetadata[currentFileUUID];
       delete this.fullFilePathToUUID[file.fullFilePath];
+
+      this.saveHashtables();
 
       // Move to next version
       currentFileUUID = file.nextVersion;
@@ -919,9 +931,13 @@ class DriveDB {
         );
       }
 
+      file.lastChangedUnixMs = new Date().getTime();
+      file.deleted = true;
+
       // Remove file from all data structures
-      delete this.fileUUIDToMetadata[priorFileUUID];
       delete this.fullFilePathToUUID[file.fullFilePath];
+
+      this.saveHashtables();
 
       // Move to previous version
       priorFileUUID = file.priorVersion;
@@ -961,6 +977,7 @@ class DriveDB {
     file.originalFileName = newFileName;
     file.fullFilePath = newPath;
     file.extension = newFileName.split(".").pop() || "";
+    file.lastChangedUnixMs = new Date().getTime();
 
     // Update the hashtables
     delete this.fullFilePathToUUID[oldPath];
@@ -1005,6 +1022,7 @@ class DriveDB {
     // Update the folder metadata
     folder.originalFolderName = newFolderName;
     folder.fullFolderPath = newPath;
+    folder.lastChangedUnixMs = new Date().getTime();
 
     // Update the hashtables
     delete this.fullFolderPathToUUID[oldPath];
@@ -1039,6 +1057,7 @@ class DriveDB {
 
       // Update subfolder metadata
       subfolder.fullFolderPath = newSubfolderPath;
+      subfolder.lastChangedUnixMs = new Date().getTime();
 
       // Update hashtables
       delete this.fullFolderPathToUUID[oldSubfolderPath];
@@ -1059,11 +1078,238 @@ class DriveDB {
 
       // Update file metadata
       file.fullFilePath = newFilePath;
+      file.lastChangedUnixMs = new Date().getTime();
 
       // Update hashtables
       delete this.fullFilePathToUUID[oldFilePath];
       this.fullFilePathToUUID[newFilePath] = fileUUID;
     }
+  }
+
+  // modify for sync
+  surgicallySyncFileUUID(oldFileId: FileUUID, newFileId: FileUUID) {
+    console.log(
+      `surgicallySyncFileUUID> oldFileId: ${oldFileId}, newFileId: ${newFileId}`
+    );
+    if (oldFileId === newFileId) {
+      return;
+    }
+    if (!oldFileId || !newFileId) {
+      throw new Error("Invalid file IDs");
+    }
+    // get old file metadata
+    const oldFile = this.fileUUIDToMetadata[oldFileId];
+    if (!oldFile) {
+      throw new Error("Old file not found");
+    }
+    // get parent folder
+    const parentFolder = this.folderUUIDToMetadata[oldFile.folderUUID];
+    if (!parentFolder) {
+      throw new Error("Parent folder not found");
+    }
+    // update file metadata
+    const newFile = {
+      ...oldFile,
+      id: newFileId,
+      lastChangedUnixMs: new Date().getTime(),
+    };
+    // update hashtables
+    this.fileUUIDToMetadata[newFileId] = newFile;
+    this.fullFilePathToUUID[newFile.fullFilePath] = newFileId;
+    // update parent folder
+    const newParentFolder = { ...parentFolder };
+    newParentFolder.fileUUIDs = parentFolder.fileUUIDs.map((uuid) =>
+      uuid === oldFileId ? newFileId : uuid
+    );
+    this.folderUUIDToMetadata[parentFolder.id] = newParentFolder;
+    this.saveHashtables();
+    return newFileId;
+  }
+  surgicallySyncFolderUUID(oldFolderId: FolderUUID, newFolderId: FolderUUID) {
+    console.log(
+      `surgicallySyncFolderUUID> oldFolderId: ${oldFolderId}, newFolderId: ${newFolderId}`
+    );
+    if (oldFolderId === newFolderId) {
+      return;
+    }
+    if (!oldFolderId || !newFolderId) {
+      throw new Error("Invalid folder IDs");
+    }
+    // get old folder metadata
+    const oldFolder = this.folderUUIDToMetadata[oldFolderId];
+    if (!oldFolder) {
+      throw new Error("Old folder not found");
+    }
+    if (oldFolder.parentFolderUUID) {
+      // get parent folder
+      const parentFolder =
+        this.folderUUIDToMetadata[oldFolder.parentFolderUUID];
+      if (!parentFolder) {
+        throw new Error("Parent folder not found");
+      }
+      // update parents
+      const newParentFolder = { ...parentFolder };
+      newParentFolder.subfolderUUIDs = parentFolder.subfolderUUIDs.map(
+        (uuid) => (uuid === oldFolderId ? newFolderId : uuid)
+      );
+      this.folderUUIDToMetadata[parentFolder.id] = newParentFolder;
+    }
+    // update folder metadata
+    const newFolder = {
+      ...oldFolder,
+      id: newFolderId,
+      lastChangedUnixMs: new Date().getTime(),
+    };
+    // update hashtables
+    this.folderUUIDToMetadata[newFolderId] = newFolder;
+    this.fullFolderPathToUUID[newFolder.fullFolderPath] = newFolderId;
+    // update subfolders
+    for (const subfolderUUID of newFolder.subfolderUUIDs) {
+      const subfolder = this.folderUUIDToMetadata[subfolderUUID];
+      if (subfolder) {
+        const newSubfolder = { ...subfolder };
+        newSubfolder.parentFolderUUID = newFolderId;
+        this.folderUUIDToMetadata[subfolder.id] = newSubfolder;
+      }
+    }
+    // update files
+    for (const fileUUID of newFolder.fileUUIDs) {
+      const file = this.fileUUIDToMetadata[fileUUID];
+      if (file) {
+        const newFile = { ...file, folderUUID: newFolderId };
+        this.fileUUIDToMetadata[file.id] = newFile;
+      }
+    }
+    this.saveHashtables();
+    return newFolderId;
+  }
+  upsertLocalFileWithCloudSync(
+    fileID: FileUUID,
+    fileMetadata: Partial<FileMetadata>
+  ) {
+    // file version history might have changed a lot offline, possibly way ahead or behind cloud
+    // we dont need to sync the file version history from cloud to local, we only need to update the version number as its a mutable variable single reference
+    // this means we wont have cloud history of file updates, only the merge of local + latest cloud
+    const file = this.fileUUIDToMetadata[fileID];
+    if (!file) {
+      throw new Error(DRIVE_ERRORS.FILE_NOT_FOUND);
+    }
+    const oldPath = file.fullFilePath;
+    const newFillFilePath = fileMetadata.fullFilePath || "";
+    const [storageLocation, ...newPathParts] = newFillFilePath.split("::");
+    const newFileName = sanitizeFilePath(fileMetadata.originalFileName || "");
+
+    // Check if the new name is valid
+    console.log(`check if new name valid = ${newFileName}`);
+    if (newFileName.includes("/") || newFileName === "") {
+      throw new Error(DRIVE_ERRORS.INVALID_NAME);
+    }
+
+    // Create the new path
+    const newFilePath = newPathParts[0].split("/");
+    newFilePath[newFilePath.length - 1] = newFileName;
+    const newPath =
+      `${storageLocation}::${newFilePath.join("/")}` as DriveFullFilePath;
+
+    // Update the file metadata
+    file.originalFileName = newFileName;
+    file.folderUUID = fileMetadata.folderUUID || file.folderUUID;
+    file.fileVersion = fileMetadata.fileVersion || file.fileVersion;
+    file.nextVersion = fileMetadata.nextVersion || null;
+    file.extension = newFileName.split(".").pop() || "";
+    file.fullFilePath = newPath;
+    file.tags = fileMetadata.tags || file.tags;
+    file.owner = fileMetadata.owner || file.owner;
+    file.createdDate = fileMetadata.createdDate || file.createdDate;
+    file.modifiedDate = fileMetadata.modifiedDate || new Date();
+    file.storageLocation = fileMetadata.storageLocation || file.storageLocation;
+    file.fileSize = fileMetadata.fileSize || file.fileSize;
+    file.rawURL = fileMetadata.rawURL || file.rawURL;
+    file.deleted = fileMetadata.deleted;
+    file.lastChangedUnixMs =
+      fileMetadata.lastChangedUnixMs || new Date().getTime();
+
+    // Update the hashtables
+    delete this.fullFilePathToUUID[oldPath];
+    this.fullFilePathToUUID[newPath] = fileID;
+
+    // Add to the Fuse index
+    this.fuseIndex.add({
+      id: `file:::${fileID}` as FuseRecordID,
+      text: newFileName,
+    });
+
+    this.saveHashtables();
+
+    return file;
+  }
+  upsertLocalFolderWithCloudSync(
+    folderID: FolderUUID,
+    folderMetadata: Partial<FolderMetadata>
+  ) {
+    // overwrite local folder with cloud folder
+    // no version history for folders - dont need to worry about that
+    const folder = this.folderUUIDToMetadata[folderID];
+    if (!folder) {
+      throw new Error(DRIVE_ERRORS.FOLDER_NOT_FOUND);
+    }
+
+    const oldPath = folder.fullFolderPath;
+    const newFullFolderPath = folderMetadata.fullFolderPath || "";
+    const [storageLocation, ...newPathParts] = newFullFolderPath.split("::");
+    const newFolderName = sanitizeFilePath(
+      folderMetadata.originalFolderName || ""
+    );
+
+    // Check if the new name is valid
+    if (newFolderName.includes("/") || newFolderName === "") {
+      throw new Error(DRIVE_ERRORS.INVALID_NAME);
+    }
+
+    // Create the new path
+    const newFolderPath = newPathParts[0].split("/");
+    newFolderPath[newFolderPath.length - 2] = newFolderName; // -2 because the path ends with '/'
+    const newPath =
+      `${storageLocation}::${newFolderPath.join("/")}` as DriveFullFilePath;
+
+    // Check if a folder with the new name already exists in the parent folder
+    if (this.fullFolderPathToUUID[newPath]) {
+      throw new Error(DRIVE_ERRORS.NAME_CONFLICT);
+    }
+
+    // Update the folder metadata
+    folder.originalFolderName = newFolderName;
+    folder.parentFolderUUID =
+      folderMetadata.parentFolderUUID || folder.parentFolderUUID;
+    folder.subfolderUUIDs =
+      folderMetadata.subfolderUUIDs || folder.subfolderUUIDs;
+    folder.fileUUIDs = folderMetadata.fileUUIDs || folder.fileUUIDs;
+    folder.fullFolderPath = newPath;
+    folder.tags = folderMetadata.tags || folder.tags;
+    folder.owner = folderMetadata.owner || folder.owner;
+    folder.createdDate = folderMetadata.createdDate || folder.createdDate;
+    folder.storageLocation =
+      folderMetadata.storageLocation || folder.storageLocation;
+    folder.lastChangedUnixMs =
+      folderMetadata.lastChangedUnixMs || new Date().getTime();
+    folder.deleted = folderMetadata.deleted;
+
+    // Update the hashtables
+    delete this.fullFolderPathToUUID[oldPath];
+    this.fullFolderPathToUUID[newPath] = folderID;
+
+    // Add to the Fuse index
+    this.fuseIndex.add({
+      id: `folder:::${folderID}` as FuseRecordID,
+      text: newFolderName,
+    });
+
+    // Recursively update all subfolders and files
+    this.updateSubpaths(folder, oldPath, newPath);
+
+    this.saveHashtables();
+
+    return folder;
   }
 
   // TODO: Move, Copy Files (observable)

@@ -35,6 +35,8 @@ export interface FolderMetadata {
   owner: UserID;
   createdDate: Date; // ISO 8601 format
   storageLocation: StorageLocationEnum;
+  lastChangedUnixMs: number; // unix time ms
+  deleted?: boolean;
 }
 
 // Type for File Metadata
@@ -54,6 +56,8 @@ export interface FileMetadata {
   storageLocation: StorageLocationEnum;
   fileSize: number; // in bytes
   rawURL: DriveFileRawDestination; // the real location of the file
+  lastChangedUnixMs: number; // unix time ms
+  deleted?: boolean;
 }
 
 // Type for Full Folder Path to UUID Hashtable

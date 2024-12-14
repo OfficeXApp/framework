@@ -61,6 +61,7 @@ export const FolderUUIDToMetadata: Hashtable_FolderUUIDToMetadata = {
     owner: mockUserID,
     createdDate: mockDate,
     storageLocation: StorageLocationEnum.BrowserCache,
+    lastChangedUnixMs: 0,
   },
   ["mock-uuid-3" as FolderUUID]: {
     id: "mock-uuid-3" as FolderUUID,
@@ -73,6 +74,7 @@ export const FolderUUIDToMetadata: Hashtable_FolderUUIDToMetadata = {
     owner: mockUserID,
     createdDate: mockDate,
     storageLocation: StorageLocationEnum.BrowserCache,
+    lastChangedUnixMs: 0,
   },
   ["mock-uuid-4" as FolderUUID]: {
     id: "mock-uuid-4" as FolderUUID,
@@ -85,6 +87,7 @@ export const FolderUUIDToMetadata: Hashtable_FolderUUIDToMetadata = {
     owner: mockUserID,
     createdDate: mockDate,
     storageLocation: StorageLocationEnum.BrowserCache,
+    lastChangedUnixMs: 0,
   },
 };
 export const FileUUIDToMetadata: Hashtable_FileUUIDToMetadata = {
@@ -105,6 +108,7 @@ export const FileUUIDToMetadata: Hashtable_FileUUIDToMetadata = {
     storageLocation: StorageLocationEnum.BrowserCache,
     fileSize: 0,
     rawURL: "",
+    lastChangedUnixMs: 0,
   },
   ["mock-uuid-5" as FileUUID]: {
     id: "mock-uuid-5" as FileUUID,
@@ -123,6 +127,7 @@ export const FileUUIDToMetadata: Hashtable_FileUUIDToMetadata = {
     storageLocation: StorageLocationEnum.BrowserCache,
     fileSize: 0,
     rawURL: "",
+    lastChangedUnixMs: 0,
   },
 };
 

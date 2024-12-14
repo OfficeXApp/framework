@@ -30,4 +30,4 @@ export const ONBOARDING_CHECKPOINTS = {
   SAMPLE_FILES_LOADED: "SAMPLE_FILES_LOADED",
 };
 
-export const FACTORY_CANISTER_ID = "br5f7-7uaaa-aaaaa-qaaca-cai";
+export const FACTORY_CANISTER_ID = "bkyz2-fmaaa-aaaaa-qaaaq-cai";
