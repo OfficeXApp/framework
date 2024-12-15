@@ -64,7 +64,6 @@ describe("DriveDB - uploadFilesFolders", () => {
               id: "mock-uuid-1" as FileUUID,
               name: "test.txt",
               mimeType: "text/plain",
-              modifiedDate: new Date(),
               fileSize: 12,
               rawURL: "test-url",
             },
@@ -146,7 +145,6 @@ describe("DriveDB - uploadFilesFolders", () => {
               id: `mock-uuid-${callCount + 4}` as FileUUID,
               name: `file${callCount}.txt`,
               mimeType: "text/plain",
-              modifiedDate: new Date(),
               fileSize: 13,
               rawURL: `test-url-${callCount}`,
             },
@@ -231,7 +229,6 @@ describe("DriveDB - uploadFilesFolders", () => {
           id: uuidv4() as FileUUID,
           name: file.name,
           mimeType: file.type,
-          modifiedDate: new Date(),
           fileSize: file.size,
           rawURL: "test-url",
         };

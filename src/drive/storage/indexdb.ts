@@ -230,9 +230,6 @@ class IndexedDBStorage {
     const ext = file.name.split(".").pop();
     const metadata: FileMetadataFragment = {
       id,
-      modifiedDate: file.lastModified
-        ? new Date(file.lastModified)
-        : new Date(),
       fileSize: file.size,
       rawURL: `${id}.${ext}` as DriveFileRawDestinationIndexDBFileID,
       name: file.name,

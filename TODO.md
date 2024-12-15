@@ -2,7 +2,13 @@
 
 ## New ToDo
 
+- [ ] Add cloud sync for folders
+- [ ] Write recursive sync cloud, with full depth at root
+- [ ] Test that sync works without bugs
+- [ ] Test rollback file
+
 - [ ] Add unit tests for .lastChangedUnixMs and surgicallySyncFileUUID/surgicallySyncFolderUUID
+- [ ] Should we have an expires at for free anon file sharing? (so that old anon shares dont appear as broken)
 
 ## Quick Notes
 

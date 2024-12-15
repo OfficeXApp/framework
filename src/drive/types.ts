@@ -52,7 +52,6 @@ export interface FileMetadata {
   tags: Tag[];
   owner: UserID;
   createdDate: Date; // ISO 8601 format
-  modifiedDate: Date; // ISO 8601 format
   storageLocation: StorageLocationEnum;
   fileSize: number; // in bytes
   rawURL: DriveFileRawDestination; // the real location of the file
@@ -118,7 +117,6 @@ export interface FileMetadataFragment {
   id: FileUUID;
   name: string;
   mimeType: string;
-  modifiedDate: Date;
   fileSize: number;
   rawURL: DriveFileRawDestination;
 }

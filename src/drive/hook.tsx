@@ -44,6 +44,9 @@ interface DriveContextType {
   getFileByFullPath: (
     fullFilePath: DriveFullFilePath
   ) => Promise<FileMetadata | undefined>;
+  getFolderByFullPath: (
+    fullFolderPath: DriveFullFilePath
+  ) => FolderMetadata | undefined;
   cancelUpload: (id: string) => void;
   cancelAllUploads: () => void;
   getUploadQueue: () => UploadItem[];
@@ -497,6 +500,13 @@ export const DriveProvider: React.FC<DriveProviderProps> = ({
     }
   };
 
+  const getFolderByFullPath = (fullFolderPath: DriveFullFilePath) => {
+    if (driveDB.current) {
+      return driveDB.current.getFolderByFullPath(fullFolderPath);
+    }
+    return undefined;
+  };
+
   const value: DriveContextType = {
     isInitialized,
     initStorj,
@@ -523,6 +533,7 @@ export const DriveProvider: React.FC<DriveProviderProps> = ({
     surgicallySyncFolderUUID,
     upsertLocalFileWithCloudSync,
     upsertLocalFolderWithCloudSync,
+    getFolderByFullPath,
   };
 
   return (
