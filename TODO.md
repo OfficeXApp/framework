@@ -2,13 +2,16 @@
 
 ## New ToDo
 
-- [ ] Add cloud sync for folders
-- [ ] Write recursive sync cloud, with full depth at root
-- [ ] Test that sync works without bugs
-- [ ] Test rollback file
+- [ ] Test that sync works without bugs (fix folder ;;;bug and duplicate file local bug)
+- [ ] Logout & import ICP seed phrase, sync cloud
+- [ ] Fix local vs cloud file datetimes & owner principal/userID
+- [ ] Add expiresIn
 
 - [ ] Add unit tests for .lastChangedUnixMs and surgicallySyncFileUUID/surgicallySyncFolderUUID
 - [ ] Should we have an expires at for free anon file sharing? (so that old anon shares dont appear as broken)
+
+- [x] Add cloud sync for folders
+- [x] Write recursive sync cloud, with full depth at root
 
 ## Quick Notes
 

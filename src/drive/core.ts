@@ -207,12 +207,9 @@ class DriveDB {
 
     // Update parent folder's fileUUIDs
     const parentFolder = this.folderUUIDToMetadata[folderUUID];
-    if (priorVersion) {
-      // Remove the old file UUID from the parent folder
-      parentFolder.fileUUIDs = parentFolder.fileUUIDs.filter(
-        (uuid) => uuid !== priorVersion
-      );
-    }
+    parentFolder.fileUUIDs = parentFolder.fileUUIDs.filter(
+      (uuid) => uuid !== priorVersion
+    );
     // Add the new file UUID to the parent folder
     parentFolder.fileUUIDs = parentFolder.fileUUIDs.filter(
       (uuid) => uuid !== newFileUUID
@@ -327,7 +324,10 @@ class DriveDB {
     storageLocation: StorageLocationEnum,
     userId: UserID
   ): FolderMetadata {
+    console.log(`fullFolderPath`, fullFolderPath);
     const [storagePart, ...pathParts] = fullFolderPath.split("::");
+    console.log(`storagePart`, storagePart);
+    console.log(`pathParts`, pathParts);
     const pathString = pathParts.join("::"); // Rejoin in case there were extra "::" in the path
     console.log(`pathString`, pathString);
     const sanitizedPath = sanitizeFilePath(pathString);
@@ -1208,7 +1208,11 @@ class DriveDB {
     // file version history might have changed a lot offline, possibly way ahead or behind cloud
     // we dont need to sync the file version history from cloud to local, we only need to update the version number as its a mutable variable single reference
     // this means we wont have cloud history of file updates, only the merge of local + latest cloud
-    let existingFile = this.fileUUIDToMetadata[fileID];
+    if (!fileMetadata.fullFilePath) {
+      throw new Error(DRIVE_ERRORS.FILE_NOT_FOUND);
+    }
+    let _existingFileID = this.fullFilePathToUUID[fileMetadata.fullFilePath];
+    let existingFile = this.fileUUIDToMetadata[_existingFileID];
     console.log(`existingFile initial`, existingFile);
 
     const newFillFilePath = fileMetadata.fullFilePath || "";
@@ -1299,7 +1303,7 @@ class DriveDB {
     newFile.lastChangedUnixMs =
       fileMetadata.lastChangedUnixMs || new Date().getTime();
 
-    console.log(`newFile after`, newFile);
+    console.log(`newFile,, after`, newFile);
 
     // Update hashtables
     // Update the hashtables
@@ -1314,7 +1318,8 @@ class DriveDB {
       if (existingFile?.priorVersion) {
         // Remove the old file UUID from the parent folder
         parentFolder.fileUUIDs = parentFolder.fileUUIDs.filter(
-          (uuid) => uuid !== existingFile?.priorVersion
+          (uuid) =>
+            uuid !== existingFile?.priorVersion && uuid !== existingFile.id
         );
       }
       // remove the old file UUID from the parent folder just in case
@@ -1328,6 +1333,7 @@ class DriveDB {
     // Update prior version if it exists
     if (existingFile?.priorVersion) {
       this.fileUUIDToMetadata[existingFile?.priorVersion].nextVersion = fileID;
+      this.fileUUIDToMetadata[existingFile?.id].nextVersion = fileID;
     }
 
     // Add to the Fuse index
@@ -1346,7 +1352,11 @@ class DriveDB {
   ) {
     // overwrite local folder with cloud folder
     // no version history for folders - dont need to worry about that
-    let folder = this.folderUUIDToMetadata[folderID];
+    if (!folderMetadata.fullFolderPath) {
+      throw new Error(DRIVE_ERRORS.FOLDER_NOT_FOUND);
+    }
+    let _folderID = this.fullFolderPathToUUID[folderMetadata.fullFolderPath];
+    let folder = this.folderUUIDToMetadata[_folderID];
     // if (!folder) {
     //   throw new Error(DRIVE_ERRORS.FOLDER_NOT_FOUND);
     // }
@@ -1377,7 +1387,7 @@ class DriveDB {
         owner: folderMetadata.owner || ("" as UserID),
         createdDate:
           new Date(folderMetadata.createdDate?.toString() || 0) || new Date(),
-        storageLocation: storageLocation as StorageLocationEnum,
+        storageLocation: folderMetadata.storageLocation as StorageLocationEnum,
         lastChangedUnixMs: folderMetadata.lastChangedUnixMs || 0,
         deleted: folderMetadata.deleted || false,
       };
@@ -1409,8 +1419,7 @@ class DriveDB {
     folder.createdDate = folderMetadata.createdDate || folder.createdDate;
     // @ts-ignore
     folder.storageLocation =
-      Object.keys(folderMetadata.storageLocation || {})[0] ||
-      folder.storageLocation;
+      folderMetadata.storageLocation || folder.storageLocation;
     folder.lastChangedUnixMs =
       folderMetadata.lastChangedUnixMs || new Date().getTime();
     folder.deleted = folderMetadata.deleted || false;
