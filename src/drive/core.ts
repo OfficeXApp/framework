@@ -90,7 +90,7 @@ class DriveDB {
     if (this.isInitialized) return;
     await this.indexDBStorage.initialize();
     this.isInitialized = true;
-    // console.log(`DriveDB initialized to `, this.isInitialized);
+
     await this.loadHashtables();
   }
 
@@ -159,10 +159,10 @@ class DriveDB {
     let fileVersion = 1;
     let priorVersion: FileUUID | null = null;
 
-    const fileAlreadyExists = this.fullFilePathToUUID[fullFilePath];
+    const preExistingFileId = this.fullFilePathToUUID[fullFilePath];
 
     // Check if file already exists
-    if (fileAlreadyExists) {
+    if (preExistingFileId) {
       const existingFileUUID = this.fullFilePathToUUID[fullFilePath];
       const existingFile = this.fileUUIDToMetadata[existingFileUUID];
       fileVersion = existingFile.fileVersion + 1;
@@ -207,21 +207,43 @@ class DriveDB {
 
     // Update parent folder's fileUUIDs
     const parentFolder = this.folderUUIDToMetadata[folderUUID];
-    parentFolder.fileUUIDs = parentFolder.fileUUIDs.filter(
-      (uuid) => uuid !== priorVersion
-    );
-    // Add the new file UUID to the parent folder
-    parentFolder.fileUUIDs = parentFolder.fileUUIDs.filter(
-      (uuid) => uuid !== newFileUUID
-    );
-    parentFolder.fileUUIDs.push(newFileUUID);
-
-    // Update prior version if it exists
-    if (priorVersion) {
-      this.fileUUIDToMetadata[priorVersion].nextVersion = newFileUUID;
+    if (parentFolder) {
+      parentFolder.fileUUIDs = parentFolder.fileUUIDs.filter(
+        (uuid) =>
+          uuid !== priorVersion &&
+          uuid !== preExistingFileId &&
+          uuid !== newFileUUID
+      );
+      parentFolder.fileUUIDs.push(newFileUUID);
     }
 
-    if (!fileAlreadyExists) {
+    // Clean up version chain in folder
+    if (folderUUID) {
+      const parentFolder = this.folderUUIDToMetadata[folderUUID];
+      if (parentFolder) {
+        // Remove all previous versions from folder's fileUUIDs
+        let currentVersion = priorVersion;
+        while (currentVersion) {
+          const versionFile = this.fileUUIDToMetadata[currentVersion];
+          if (versionFile) {
+            parentFolder.fileUUIDs = parentFolder.fileUUIDs.filter(
+              (uuid) => uuid !== currentVersion
+            );
+            currentVersion = versionFile.priorVersion;
+          } else {
+            break;
+          }
+        }
+
+        // Add only the new version
+        parentFolder.fileUUIDs = parentFolder.fileUUIDs.filter(
+          (uuid) => uuid !== newFileUUID
+        );
+        parentFolder.fileUUIDs.push(newFileUUID);
+      }
+    }
+
+    if (!preExistingFileId) {
       const fuseRecord: FuseRecord = {
         id: `file:::${newFileUUID}`,
         text: fileName,
@@ -324,14 +346,10 @@ class DriveDB {
     storageLocation: StorageLocationEnum,
     userId: UserID
   ): FolderMetadata {
-    console.log(`fullFolderPath`, fullFolderPath);
     const [storagePart, ...pathParts] = fullFolderPath.split("::");
-    console.log(`storagePart`, storagePart);
-    console.log(`pathParts`, pathParts);
-    const pathString = pathParts.join("::"); // Rejoin in case there were extra "::" in the path
-    console.log(`pathString`, pathString);
+    const pathString = pathParts.join("/"); // Rejoin in case there were extra "::" in the path
+
     const sanitizedPath = sanitizeFilePath(pathString);
-    console.log(`sanitizedPath`, sanitizedPath);
 
     const sanitizedPathParts = sanitizedPath.split("/").filter(Boolean);
 
@@ -747,8 +765,6 @@ class DriveDB {
     const { fullFolderPath, limit, after } = config;
     const folderUUID = this.fullFolderPathToUUID[fullFolderPath];
 
-    console.log(`fetchFilesAtFolderPath -> folderUUID`, folderUUID);
-
     if (!folderUUID) {
       return {
         folders: [],
@@ -759,7 +775,6 @@ class DriveDB {
     }
 
     const folderMetadata = this.folderUUIDToMetadata[folderUUID];
-    console.log(`fetchFilesAtFolderPath -> folderMetadata`, folderMetadata);
 
     if (!folderMetadata) {
       return {
@@ -1107,9 +1122,6 @@ class DriveDB {
 
   // modify for sync
   surgicallySyncFileUUID(oldFileId: FileUUID, newFileId: FileUUID) {
-    console.log(
-      `surgicallySyncFileUUID> oldFileId: ${oldFileId}, newFileId: ${newFileId}`
-    );
     if (oldFileId === newFileId) {
       return;
     }
@@ -1145,9 +1157,6 @@ class DriveDB {
     return newFileId;
   }
   surgicallySyncFolderUUID(oldFolderId: FolderUUID, newFolderId: FolderUUID) {
-    console.log(
-      `surgicallySyncFolderUUID> oldFolderId: ${oldFolderId}, newFolderId: ${newFolderId}`
-    );
     if (oldFolderId === newFolderId) {
       return;
     }
@@ -1213,14 +1222,13 @@ class DriveDB {
     }
     let _existingFileID = this.fullFilePathToUUID[fileMetadata.fullFilePath];
     let existingFile = this.fileUUIDToMetadata[_existingFileID];
-    console.log(`existingFile initial`, existingFile);
 
     const newFillFilePath = fileMetadata.fullFilePath || "";
     const [storageLocation, ...newPathParts] = newFillFilePath.split("::");
     const newFileName = sanitizeFilePath(fileMetadata.originalFileName || "");
 
     // Check if the new name is valid
-    console.log(`fileMetadata =`, fileMetadata);
+
     if (newFileName.includes("/") || newFileName === "") {
       throw new Error(DRIVE_ERRORS.INVALID_NAME);
     }
@@ -1231,11 +1239,9 @@ class DriveDB {
     const newPath =
       `${storageLocation}::${newFilePath.join("/")}` as DriveFullFilePath;
     const oldPath = existingFile?.fullFilePath || newPath;
-    console.log(`---newPath`, newPath);
-    console.log(`---oldPath`, oldPath);
     if (!existingFile) {
       this.upsertFileToHashTables(
-        fileMetadata.fullFilePath || "",
+        newPathParts.join("/") || "",
         storageLocation as StorageLocationEnum,
         (fileMetadata.owner || "") as UserID,
         {
@@ -1269,9 +1275,8 @@ class DriveDB {
       lastChangedUnixMs: new Date().getTime(),
     };
 
-    console.log(`existingFile`, existingFile);
     const newFile = existingFile ? { ...existingFile } : defaultMetdata;
-    console.log(`newFile before`, newFile);
+
     newFile.originalFileName = newFileName;
     newFile.folderUUID =
       fileMetadata.folderUUID ||
@@ -1302,8 +1307,6 @@ class DriveDB {
     newFile.deleted = fileMetadata.deleted || false;
     newFile.lastChangedUnixMs =
       fileMetadata.lastChangedUnixMs || new Date().getTime();
-
-    console.log(`newFile,, after`, newFile);
 
     // Update hashtables
     // Update the hashtables
@@ -1360,15 +1363,11 @@ class DriveDB {
     // if (!folder) {
     //   throw new Error(DRIVE_ERRORS.FOLDER_NOT_FOUND);
     // }
-    console.log(`prexisting folder`, folder);
-    console.log(`folderMetadata`, folderMetadata);
     const newFullFolderPath = folderMetadata.fullFolderPath || "";
     const [storageLocation, ...newPathParts] = newFullFolderPath.split("::");
     const newFolderName = sanitizeFilePath(
       folderMetadata.originalFolderName || ""
     );
-    console.log(`newFolderName`, newFolderName);
-    console.log(`storageLocation`, storageLocation);
 
     // Check if the new name is valid
     if (newFolderName.includes("/")) {
@@ -1392,7 +1391,6 @@ class DriveDB {
         deleted: folderMetadata.deleted || false,
       };
     }
-    console.log(`> folder`, folder);
 
     // Create the new path
     const oldPath = folder?.fullFolderPath || newFullFolderPath;
@@ -1402,9 +1400,6 @@ class DriveDB {
     }
     const newPath =
       `${storageLocation || folderMetadata.storageLocation}::${newFolderPath.join("/")}` as DriveFullFilePath;
-
-    console.log(`> newPath`, newPath);
-    console.log(`> oldPath`, oldPath);
 
     // Update the folder metadata
     folder.originalFolderName = newFolderName;
@@ -1428,14 +1423,11 @@ class DriveDB {
     delete this.fullFolderPathToUUID[oldPath];
     this.fullFolderPathToUUID[newPath] = folderID;
 
-    console.log(`folder after`, folder);
-
     // Add to the Fuse index
     this.fuseIndex.add({
       id: `folder:::${folderID}` as FuseRecordID,
       text: newFolderName,
     });
-    console.log(`folder with update subpaths`, folder);
     // Recursively update all subfolders and files
     this.updateSubpaths(folder, oldPath, newPath);
 
@@ -1532,7 +1524,7 @@ class DriveDB {
     for (const [fullFilePath, fileUUID] of Object.entries(
       this.fullFilePathToUUID
     )) {
-      console.log(`${fullFilePath.length}`);
+      console.log(fullFilePath);
       const fileMetadata = this.fileUUIDToMetadata[fileUUID];
       if (fileMetadata) {
         this.fuseIndex.add({
