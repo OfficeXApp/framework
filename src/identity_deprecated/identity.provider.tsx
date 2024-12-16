@@ -8,7 +8,7 @@ import React, {
   MutableRefObject,
 } from "react";
 import { mnemonicToAccount, Account } from "viem/accounts";
-import { Actor, HttpAgent } from "@dfinity/agent";
+import { Actor, ActorSubclass, HttpAgent } from "@dfinity/agent";
 import {
   LOCAL_STORAGE_EVM_WALLET_MNEMONIC,
   LOCAL_STORAGE_ALIAS_NICKNAME,
@@ -26,17 +26,24 @@ import {
 } from "./icp-auth";
 import { trackUserSignup } from "../tracking/tracking";
 import { Ed25519KeyIdentity } from "@dfinity/identity";
-import { idlFactory as idlFactory_Factory } from "../declarations/factory-canister/factory-canister.did.js";
-import { idlFactory as idlFactory_Drive } from "../declarations/officex-canisters-backend/officex-canisters-backend.did.js";
+import {
+  idlFactory as idlFactory_Factory,
+  _SERVICE as FactorySERVICE,
+} from "../declarations/factory-canister/factory-canister.did.js";
+import {
+  idlFactory as idlFactory_Drive,
+  _SERVICE as DriveSERVICE,
+} from "../declarations/officex-canisters-backend/officex-canisters-backend.did.js";
 
 export interface IdentityContextProps {
   evmAccount: Account | null;
   evmSlug: string;
   icpAccount: ICPAccount | null;
   icpSlug: string;
-  icpCanister: string;
+  icpCanisterId: string;
   alias: string;
-  icpAgent: MutableRefObject<HttpAgent | undefined>; // Added icpAgent
+  icpAgent: MutableRefObject<HttpAgent | undefined>; // Http Agent for interacting with the ICP
+  icpActor: Actor | undefined; // Actor for interacting with the ICP canister
   deployIcpCanister: () => void;
   initializeIdentity: (m: string) => void;
 }
@@ -62,7 +69,8 @@ export const IdentityProvider: React.FC<{ children: ReactNode }> = ({
     icpSlug: "0i0",
     alias: "0x0",
   });
-  const [icpCanister, setIcpCanister] = useState<string>("");
+  const [icpCanisterId, setIcpCanisterId] = useState<string>("");
+  const icpActor = useRef<ActorSubclass<DriveSERVICE>>();
 
   useEffect(() => {
     initializeIdentity();
@@ -135,7 +143,7 @@ export const IdentityProvider: React.FC<{ children: ReactNode }> = ({
     // Set the host URL
     const host = isProduction ? "https://icp-api.io" : "http://localhost:4943";
 
-    const agent = new HttpAgent({ identity, host });
+    const agent = HttpAgent.createSync({ identity, host });
 
     console.log(`Hostname: ${hostname}`);
     console.log(`Is Production: ${isProduction}`);
@@ -164,14 +172,14 @@ export const IdentityProvider: React.FC<{ children: ReactNode }> = ({
     );
     if (canisterId) {
       // set to usestate
-      setIcpCanister(canisterId);
+      setIcpCanisterId(canisterId);
       // check ping
-      await pingIcpCanister(canisterId);
+      await initPingIcpCanister(canisterId);
     } else {
       console.log(
         "No ICP Canister found in local storage, try public key directly"
       );
-      const actor = Actor.createActor(idlFactory_Factory, {
+      const actor = Actor.createActor<FactorySERVICE>(idlFactory_Factory, {
         agent: icpAgent.current,
         canisterId: FACTORY_CANISTER_ID,
       });
@@ -179,9 +187,9 @@ export const IdentityProvider: React.FC<{ children: ReactNode }> = ({
       console.log(res);
       if (res[0]) {
         const driveId = res[0];
-        setIcpCanister(driveId);
+        setIcpCanisterId(driveId);
         localStorage.setItem(LOCAL_STORAGE_ICP_CANISTER_DRIVE_ID, driveId);
-        await pingIcpCanister(driveId);
+        await initPingIcpCanister(driveId);
       }
     }
   };
@@ -205,9 +213,9 @@ export const IdentityProvider: React.FC<{ children: ReactNode }> = ({
     console.log(`Result of creating drive canister`, result);
     if (result.Ok) {
       console.log(`Drive canister created: ${result.Ok}`);
-      setIcpCanister(result.Ok);
+      setIcpCanisterId(result.Ok);
       localStorage.setItem(LOCAL_STORAGE_ICP_CANISTER_DRIVE_ID, result.Ok);
-      await pingIcpCanister(result.Ok);
+      await initPingIcpCanister(result.Ok);
     }
     if (result.Err) {
       console.error(`Error creating drive canister: ${result.Err}`);
@@ -216,21 +224,22 @@ export const IdentityProvider: React.FC<{ children: ReactNode }> = ({
         console.log(res);
         if (res[0]) {
           const driveId = res[0];
-          setIcpCanister(driveId);
+          setIcpCanisterId(driveId);
           localStorage.setItem(LOCAL_STORAGE_ICP_CANISTER_DRIVE_ID, driveId);
-          await pingIcpCanister(driveId);
+          await initPingIcpCanister(driveId);
         }
       }
     }
   };
 
-  const pingIcpCanister = async (id: string = icpCanister) => {
-    const actor = Actor.createActor(idlFactory_Drive, {
+  const initPingIcpCanister = async (id: string = icpCanisterId) => {
+    const actor = Actor.createActor<DriveSERVICE>(idlFactory_Drive, {
       agent: icpAgent.current,
       canisterId: id,
     });
     const res = await actor.ping();
-    console.log(`Ping response: ${res}`);
+    console.log(`Init Ping response: ${res}`);
+    icpActor.current = actor;
   };
 
   return (
@@ -238,7 +247,8 @@ export const IdentityProvider: React.FC<{ children: ReactNode }> = ({
       value={{
         ...identity,
         icpAgent,
-        icpCanister,
+        icpActor: icpActor.current,
+        icpCanisterId,
         deployIcpCanister,
         initializeIdentity,
       }}

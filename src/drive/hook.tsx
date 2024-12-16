@@ -44,6 +44,9 @@ interface DriveContextType {
   getFileByFullPath: (
     fullFilePath: DriveFullFilePath
   ) => Promise<FileMetadata | undefined>;
+  getFolderByFullPath: (
+    fullFolderPath: DriveFullFilePath
+  ) => FolderMetadata | undefined;
   cancelUpload: (id: string) => void;
   cancelAllUploads: () => void;
   getUploadQueue: () => UploadItem[];
@@ -89,6 +92,22 @@ interface DriveContextType {
     fileUUID: FileUUID
   ) => Promise<ReadableStream<Uint8Array>>;
   indexdbDownloadFile: (fileUUID: FileUUID) => Promise<void>;
+  surgicallySyncFileUUID: (
+    oldFileId: FileUUID,
+    newFileId: FileUUID
+  ) => Promise<FileUUID | undefined>;
+  surgicallySyncFolderUUID: (
+    oldFolderId: FolderUUID,
+    newFolderId: FolderUUID
+  ) => Promise<FolderUUID | undefined>;
+  upsertLocalFileWithCloudSync: (
+    fileID: FileUUID,
+    fileMetadata: Partial<FileMetadata>
+  ) => Promise<FileMetadata>;
+  upsertLocalFolderWithCloudSync: (
+    folderID: FolderUUID,
+    folderMetadata: Partial<FolderMetadata>
+  ) => Promise<FolderMetadata>;
 }
 
 const DriveContext = createContext<DriveContextType | null>(null);
@@ -430,6 +449,64 @@ export const DriveProvider: React.FC<DriveProviderProps> = ({
     []
   );
 
+  const surgicallySyncFileUUID = async (
+    oldFileId: FileUUID,
+    newFileId: FileUUID
+  ) => {
+    if (driveDB.current) {
+      return await driveDB.current.surgicallySyncFileUUID(oldFileId, newFileId);
+    } else {
+      throw new Error("DriveDB is not initialized");
+    }
+  };
+  const surgicallySyncFolderUUID = async (
+    oldFolderId: FolderUUID,
+    newFolderId: FolderUUID
+  ) => {
+    if (driveDB.current) {
+      return await driveDB.current.surgicallySyncFolderUUID(
+        oldFolderId,
+        newFolderId
+      );
+    } else {
+      throw new Error("DriveDB is not initialized");
+    }
+  };
+
+  const upsertLocalFileWithCloudSync = async (
+    fileID: FileUUID,
+    fileMetadata: Partial<FileMetadata>
+  ) => {
+    if (driveDB.current) {
+      return await driveDB.current.upsertLocalFileWithCloudSync(
+        fileID,
+        fileMetadata
+      );
+    } else {
+      throw new Error("DriveDB is not initialized");
+    }
+  };
+  const upsertLocalFolderWithCloudSync = async (
+    folderID: FolderUUID,
+    folderMetadata: Partial<FolderMetadata>
+  ) => {
+    if (driveDB.current) {
+      return await driveDB.current.upsertLocalFolderWithCloudSync(
+        folderID,
+        folderMetadata
+      );
+    } else {
+      throw new Error("DriveDB is not initialized");
+    }
+  };
+
+  const getFolderByFullPath = (fullFolderPath: DriveFullFilePath) => {
+    if (driveDB.current) {
+      return driveDB.current.getFolderByFullPath(fullFolderPath);
+    }
+    return undefined;
+  };
+
   const value: DriveContextType = {
     isInitialized,
     initStorj,
@@ -452,6 +529,11 @@ export const DriveProvider: React.FC<DriveProviderProps> = ({
     indexdbGetFileUrl,
     indexdbGetVideoStream,
     indexdbDownloadFile,
+    surgicallySyncFileUUID,
+    surgicallySyncFolderUUID,
+    upsertLocalFileWithCloudSync,
+    upsertLocalFolderWithCloudSync,
+    getFolderByFullPath,
   };
 
   return (

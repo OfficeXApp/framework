@@ -226,7 +226,6 @@ export class StorjClient {
             id,
             name: file.name,
             mimeType: file.type || getMimeType(file),
-            modifiedDate: new Date(file.lastModified),
             fileSize: uploadedSize,
             rawURL, // We'll update this at the end
           };
@@ -290,7 +289,6 @@ export class StorjClient {
                 id,
                 name: file.name,
                 mimeType: file.type || getMimeType(file),
-                modifiedDate: new Date(file.lastModified),
                 fileSize: totalSize,
                 rawURL: signedUrl,
               };
