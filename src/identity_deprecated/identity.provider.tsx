@@ -141,7 +141,9 @@ export const IdentityProvider: React.FC<{ children: ReactNode }> = ({
     if (isProduction) return;
 
     // Set the host URL
+    // [TEMP]
     const host = isProduction ? "https://icp-api.io" : "http://localhost:4943";
+    // const host = "https://icp-api.io";
 
     const agent = HttpAgent.createSync({ identity, host });
 
