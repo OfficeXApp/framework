@@ -30,4 +30,9 @@ export const ONBOARDING_CHECKPOINTS = {
   SAMPLE_FILES_LOADED: "SAMPLE_FILES_LOADED",
 };
 
-export const FACTORY_CANISTER_ID = "bkyz2-fmaaa-aaaaa-qaaaq-cai";
+// [TEMP]
+// export const FACTORY_CANISTER_ID = "jjx63-5iaaa-aaaak-ao7xq-cai";
+export const FACTORY_CANISTER_ID =
+  window.location.origin === "http://localhost:5173"
+    ? "bkyz2-fmaaa-aaaaa-qaaaq-cai"
+    : "jjx63-5iaaa-aaaak-ao7xq-cai";

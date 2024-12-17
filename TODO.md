@@ -13,6 +13,8 @@
 - [x] Add cloud sync for folders
 - [x] Write recursive sync cloud, with full depth at root
 
+- [ ] Bug Fix, search "FIX(SIGNED_URL_INCONSISTENT)"
+
 ## Quick Notes
 
 - [ ] Change back to 7 days signed urls file sharing

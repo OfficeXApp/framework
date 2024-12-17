@@ -94,6 +94,8 @@ export const restoreICPIdentityFromMnemonic = async (
   const privateKeyHex = arrayBufferToHex(identity.getKeyPair().secretKey);
   const publicKeyHex = arrayBufferToHex(identity.getPublicKey().toDer());
 
+  localStorage.setItem(LOCAL_STORAGE_ICP_PUBLIC_ADDRESS, publicKeyHex);
+
   // Convert the hex string into a Uint8Array (browser compatible)
   const publicKeyBuffer = hexStringToUint8Array(publicKeyHex);
 

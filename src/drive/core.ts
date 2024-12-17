@@ -743,7 +743,10 @@ class DriveDB {
         key,
         customFilename: file.originalFileName,
       });
-      file.rawURL = newSignedUrl;
+      console.log(`newSignedUrl`, newSignedUrl);
+      // file.rawURL = newSignedUrl;
+      // WARNING!! FIX(SIGNED_URL_INCONSISTENT): Theres a bug with where we cannot trust IDs since they may get overwritten by cloud version, thus breaking the rawUrl as it attempts to use use FileUUID when actual file is stored in cloud at old FileUUID.
+      // solution may be to add a new persistentFileUUID to the file metadata and use that for rawURL
       await this.saveHashtables();
     }
   }
@@ -1455,11 +1458,13 @@ class DriveDB {
   ): Promise<FileMetadata | undefined> {
     const file = this.fileUUIDToMetadata[fileUUID];
     if (file && file.storageLocation === StorageLocationEnum.Web3Storj) {
-      const key = `${fileUUID}.${file.extension}`;
-      file.rawURL = await StorjClient.getSignedUrl({
-        key,
-        customFilename: file.originalFileName,
-      });
+      // FIX(SIGNED_URL_INCONSISTENT)
+      // Surpress this for now
+      // const key = `${fileUUID}.${file.extension}`;
+      // file.rawURL = await StorjClient.getSignedUrl({
+      //   key,
+      //   customFilename: file.originalFileName,
+      // });
     }
     return file;
   }
