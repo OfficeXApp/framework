@@ -7,7 +7,10 @@ import React, {
   useRef,
   MutableRefObject,
 } from "react";
-import { mnemonicToAccount, Account } from "viem/accounts";
+import {
+  // mnemonicToAccount,
+  Account,
+} from "viem/accounts";
 import { Actor, ActorSubclass, HttpAgent } from "@dfinity/agent";
 import {
   LOCAL_STORAGE_EVM_WALLET_MNEMONIC,
@@ -17,6 +20,7 @@ import {
   LOCAL_STORAGE_ICP_WALLET_MNEMONIC,
   FACTORY_CANISTER_ID,
   LOCAL_STORAGE_ICP_CANISTER_DRIVE_ID,
+  LOCAL_STORAGE_ICP_PUBLIC_ADDRESS,
 } from "./constants";
 import { createDefaultAnonEVMIdentity, shortenAddress } from "./evm-auth"; // Adjust the import path to where your utils file is located.
 import {
@@ -91,28 +95,37 @@ export const IdentityProvider: React.FC<{ children: ReactNode }> = ({
     const existingAlias = localStorage.getItem(LOCAL_STORAGE_ALIAS_NICKNAME);
     console.log("Existing EVM Mnemonic:", existingEvmMnemonic);
     console.log("Existing ICP Mnemonic:", existingIcpMnemonic);
-    if (existingEvmMnemonic && existingIcpMnemonic) {
+    if (
+      // existingEvmMnemonic &&
+      existingIcpMnemonic
+    ) {
       console.log("Restoring existing identity");
       // Convert the mnemonic to an account object
-      const evmAccount = mnemonicToAccount(existingEvmMnemonic);
+      // const evmAccount = mnemonicToAccount(existingEvmMnemonic);
       const icpAccount =
         await restoreICPIdentityFromMnemonic(existingIcpMnemonic);
 
       // Compute the slug from the account address
-      const evmSlug = shortenAddress(evmAccount.address);
+      // const evmSlug = shortenAddress(evmAccount.address);
       const icpSlug = shortenAddress(icpAccount.principal.toText());
 
       // Save the initialized ICP Agent instance
       localStorage.removeItem(LOCAL_STORAGE_ICP_CANISTER_DRIVE_ID);
+
+      localStorage.setItem(
+        LOCAL_STORAGE_ICP_PUBLIC_ADDRESS,
+        icpAccount.principal.toText()
+      );
+
       await initIcpAgent(icpAccount.identity);
 
-      setIdentity({
-        evmAccount: evmAccount,
+      setIdentity((prev) => ({
+        evmAccount: prev.evmAccount,
         icpAccount: icpAccount,
         alias: existingAlias || "", // Use the stored alias or empty string if not found
-        evmSlug,
+        evmSlug: prev.evmSlug,
         icpSlug,
-      });
+      }));
     } else {
       console.log("Creating new anon identity");
       // Create a new default anonymous identity
@@ -135,10 +148,8 @@ export const IdentityProvider: React.FC<{ children: ReactNode }> = ({
   };
   const initIcpAgent = async (identity: Ed25519KeyIdentity) => {
     // Determine if we're running in production
-    const hostname = window.location.hostname;
-    const isProduction = hostname === "drive.officex.app";
 
-    if (isProduction) return;
+    const isProduction = window.location.hostname === "drive.officex.app";
 
     // Set the host URL
     // [TEMP]
@@ -147,7 +158,6 @@ export const IdentityProvider: React.FC<{ children: ReactNode }> = ({
 
     const agent = HttpAgent.createSync({ identity, host });
 
-    console.log(`Hostname: ${hostname}`);
     console.log(`Is Production: ${isProduction}`);
 
     // Fetch the root key only if not in production
