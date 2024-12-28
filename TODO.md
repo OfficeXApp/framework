@@ -2,8 +2,9 @@
 
 ## New ToDo
 
-- [ ] Test that sync works without bugs (fix folder ;;;bug and duplicate file local bug)
-- [ ] Logout & import ICP seed phrase, sync cloud
+- [x] Test that sync works without bugs (fix folder ;;;bug and duplicate file local bug)
+- [x] Logout & import ICP seed phrase, sync cloud
+- [ ] Fix bug where deleted folder cannot allow folder with same name to be created
 - [ ] Fix local vs cloud file datetimes & owner principal/userID
 - [ ] Add expiresIn
 
